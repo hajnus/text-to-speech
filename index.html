@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text to Speech with Speed Control and Pause</title>
+    <style>
+    body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        margin: 20px;
+    }
+    button {
+        width: 100px; /* Gomb szélessége */
+        height: 40px; /* Gomb magassága */
+        border-radius: 5px;
+        border: 2px solid #000;
+        background-color: #fff;
+        color: #000;
+        cursor: pointer;
+        font-size: 16px;
+        margin: 5px;
+    }
+    button.active {
+        background-color: #000;
+        color: #fff;
+    }
+    button.inactive {
+        background-color: #fff;
+        color: #000;
+    }
+    textarea {
+        width: 85vw; /* A szövegdoboz szélessége az oldal szélességének 85%-a */
+        height: 100px;
+        border-radius: 15px;
+        background-color: lightgrey;
+        padding: 10px;
+        box-sizing: border-box; /* Minden méretezés a padding-ot is tartalmazza */
+    }
+    button#clear-btn {
+        width: 40px; /* Gomb szélessége */
+        height: 40px; /* Gomb magassága */
+        border-radius: 50%; /* Kerek gomb */
+        border: 2px solid #000;
+        background-color: #fff;
+        color: #000;
+        cursor: pointer;
+        font-size: 20px;
+        margin-left: -30px; /* Közel helyezkedik el a szövegdobozhoz */
+        padding: 0;
+        line-height: 1;
+    }
+    .speed-control {
+        margin: 20px;
+    }
+    .button-container {
+        display: inline-block;
+        text-align: center;
+        position: relative;
+    }
+    .button-container span {
+        display: block;
+        font-size: smaller;
+        position: absolute;
+        bottom: -30px; /* A gomb alatt, állítsd be az igényed szerint */
+        left: 50%;
+        transform: translateX(-50%);
+        margin-top: 5px;
+    }
+    .text-input-container {
+        display: inline-flex;
+        align-items: center;
+        margin-bottom: 10px; /* Távolság az alatta lévő elemekhez */
+    }
+
+    /* Stop gomb stílusok eltávolítva */
+    button#stop-btn {
+        display: none; /* Elrejtjük a stop gombot */
+    }
+</style>
+</head>
+<body>
+    <h1>Text to Speech with Speed Control and Pause</h1>
+    
+    <div class="text-input-container">
+        <textarea id="text-input" placeholder="Enter text here..."></textarea>
+        <button id="clear-btn" onclick="document.getElementById('text-input').value=''">×</button>
+    </div>
+    
+    <!-- Speed control dropdown -->
+    <div class="speed-control">
+        <label for="speed-select">Select Speed:</label>
+        <select id="speed-select">
+            <option value="0.1">0.5x</option>
+            <option value="0.2">0.6x</option>
+            <option value="0.3">0.7x</option>
+            <option value="0.4">0.8x</option>
+            <option value="0.5">0.8x</option>
+            <option value="0.6" selected>1x</option>
+            <option value="0.7">1.2x</option>
+            <option value="0.8">1.3x</option>
+            <option value="0.9">1.4x</option>
+            <option value="1">1.5x</option>
+            <option value="1.1">1.6x</option>
+            <option value="1.2">1.7x</option>
+            <option value="1.3">1.8x</option>
+            <option value="1.4">1.9x</option>
+            <option value="1.5">2x</option>
+        </select>
+    </div>
+
+    <!-- Voice selection dropdown -->
+    <div class="speed-control">
+        <label for="voice-select">Select Voice:</label>
+        <select id="voice-select">
+            <!-- Options will be populated by JavaScript -->
+        </select>
+    </div>
+
+    <div class="button-container">
+        <button id="start-btn" onclick="startSpeech()">I◁</button>
+        <span> </span>
+    </div>
+
+    <div class="button-container">
+        <button id="pause-btn" onclick="pauseSpeech()">&#10074;&#10074;
+            <span> </span>
+        </button>
+        <button id="resume-btn" onclick="resumeSpeech()">&#9654;
+            <span> </span>
+        </button>
+    </div>
+
+    <!-- Stop button removed -->
+    
+    <div id="current-sentence" style="font-size: 50px; margin-top: 20px;"></div>
+
+<script>
+    let utterance = null; // Global variable for the SpeechSynthesisUtterance
+    let sentences = []; // Array to hold sentences
+    let currentIndex = 0; // Index for tracking current sentence
+    let isSpeaking = false; // Track if speech is currently active
+    let isPaused = false; // Track if speech is paused
+
+    function changeButtonState(buttonId) {
+        const buttons = document.querySelectorAll('button');
+        buttons.forEach(button => {
+            button.classList.remove('active');
+            button.classList.add('inactive');
+        });
+        if (buttonId) {
+            document.getElementById(buttonId).classList.add('active');
+            document.getElementById(buttonId).classList.remove('inactive');
+        }
+    }
+
+    function startSpeech() {
+        if (window.speechSynthesis.speaking || window.speechSynthesis.paused) {
+            window.speechSynthesis.cancel();
+        }
+
+        const text = document.getElementById('text-input').value;
+        if (!text.trim()) {
+            return;
+        }
+
+        sentences = text.match(/[^.!?]*[.!?]/g) || [];
+        currentIndex = 0;
+        isSpeaking = true;
+        isPaused = false;
+
+        changeButtonState('start-btn'); // Aktív gomb
+
+        function speakNextSentence() {
+            if (currentIndex < sentences.length) {
+                const sentence = sentences[currentIndex];
+                document.getElementById('current-sentence').innerText = sentence.trim();
+
+                // 0.2 mp várakozás előtt kezdje el a felolvasást
+                setTimeout(() => {
+                    utterance = new SpeechSynthesisUtterance(sentence);
+
+                    const rate = document.getElementById('speed-select').value;
+                    utterance.rate = parseFloat(rate);
+                    utterance.lang = 'en-US';
+                    utterance.pitch = 1;
+
+                    // Set the selected voice
+                    const selectedVoice = document.getElementById('voice-select').value;
+                    const voices = window.speechSynthesis.getVoices();
+                    utterance.voice = voices.find(voice => voice.name === selectedVoice);
+
+                    window.speechSynthesis.speak(utterance);
+
+                    utterance.onend = function() {
+                        currentIndex++;
+                        setTimeout(speakNextSentence, 200);
+                    };
+                }, 200); // 0.2 mp várakozás
+            } else {
+                isSpeaking = false;
+                changeButtonState(''); // Gomb állapot visszaállítása
+            }
+        }
+
+        speakNextSentence();
+    }
+
+    function pauseSpeech() {
+        if (window.speechSynthesis.speaking) {
+            // Pause the speech
+            window.speechSynthesis.pause();
+            isSpeaking = false;
+            isPaused = true;
+            changeButtonState('pause-btn'); // Aktív gomb
+        }
+    }
+
+    function resumeSpeech() {
+        if (isPaused) {
+            if (!window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+                // Start speech from beginning if speech is not active
+                startSpeech();
+            } else if (window.speechSynthesis.paused) {
+                // Resume the speech if it is paused
+                window.speechSynthesis.resume();
+                isSpeaking = true;
+                isPaused = false;
+                changeButtonState('resume-btn'); // Aktív gomb
+            }
+        }
+    }
+
+    function loadVoices() {
+        const voiceSelect = document.getElementById('voice-select');
+        const voices = window.speechSynthesis.getVoices();
+
+        // Clear existing options
+        voiceSelect.innerHTML = '';
+
+        voices.forEach(voice => {
+            const option = document.createElement('option');
+            option.value = voice.name;
+            option.textContent = voice.name;
+            voiceSelect.appendChild(option);
+        });
+    }
+
+    // Load voices when the page is loaded
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+
+    // Set Start button as active initially
+    changeButtonState('start-btn');
+
+    // Save text to localStorage on page unload
+    window.addEventListener('beforeunload', () => {
+        localStorage.setItem('textInput', document.getElementById('text-input').value);
+    });
+</script>
+
+</body>
+</html>
